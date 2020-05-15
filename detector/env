@@ -1,0 +1,4 @@
+
+CLASSES="good, bundle"
+NUM_TRAIN_STEPS=50000
+
