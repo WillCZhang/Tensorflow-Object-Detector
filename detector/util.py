@@ -30,6 +30,7 @@ def cropAndStoreImage(imagePath, cropFilePath):
 
 
 def getBoxToCrop(cropFilePath, shape):
+    # This function assumes exactly one line of box info in the crop file
     with open(cropFilePath) as f:
         boxes_str = f.read()
     box = [float(i) for i in eval(boxes_str.split(" - ")[2])]

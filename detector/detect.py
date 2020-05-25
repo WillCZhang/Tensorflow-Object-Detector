@@ -47,14 +47,13 @@ TEST_IMAGE_PATHS = sorted(list(PATH_TO_TEST_IMAGES_DIR.glob("*.jpg")))
 
 
 category_ids = label_map_util.get_label_map_dict(label_map_path)
-needed_boxes = util.loadEnvOrEmpty("NEEDED_BOXES")
+needed_boxes = util.loadEnvOrEmpty("NEEDED_BOXES").replace("\"", "").replace(" ", "")
 needed_boxes_dict = {}
-if needed_boxes != '':
-    needed_boxes = needed_boxes.replace("\"", "")
-    needed_boxes = needed_boxes.replace(" ", "")
-    for request in needed_boxes.split(","):
-        needed_boxes_dict[category_ids[request.split(":")[0]]] = int(request.split(":")[
-            1])
+def reloadRequiredBoxes():
+    if needed_boxes != '':
+        for request in needed_boxes.split(","):
+            needed_boxes_dict[category_ids[request.split(":")[0]]] = int(request.split(":")[1])
+
 
 confidence = util.loadEnvOrEmpty("THRESHOLD").replace("\"","")
 confidence = 0 if confidence == '' else float(confidence)
@@ -109,6 +108,8 @@ def run_inference_for_single_image(model, image, isGrayscale=False):
 
 
 def show_inference(model, image_path, isGrayscale=False):
+    print("Processing image " + str(image_path))
+    reloadRequiredBoxes()
     # the array based representation of the image will be used later in order to prepare the
     # result image with boxes and labels on it.
     image_np = np.array(Image.open(image_path))
@@ -120,19 +121,22 @@ def show_inference(model, image_path, isGrayscale=False):
         confidence_score = output_dict['detection_scores'][i]
         # Assume detections are sorted by score
         if float(confidence_score) < confidence:
+            print(f"Stopped! confidence_score {confidence_score} below confidence threshold {confidence}")
             break
         formated_result = detection_box_format(
             label_id, confidence_score,
             output_dict['detection_boxes'][i])
+        print("detect box: " + formated_result)
         result.append(formated_result)
         if label_id in needed_boxes_dict and needed_boxes_dict[label_id] > 0:
             boxes.append(formated_result)
             needed_boxes_dict[label_id] = needed_boxes_dict[label_id] - 1
     result = "\n".join(result)
     tf.io.write_file(str(image_path).replace("jpg", "result"), result)
-    boxes = "\n".join(boxes)
-    tf.io.write_file(str(image_path).replace("jpg", "crop"), boxes)
-    util.cropAndStoreImage(image_path, str(image_path).replace("jpg", "crop"))
+    if len(boxes) > 0:
+        boxes = "\n".join(boxes)
+        tf.io.write_file(str(image_path).replace("jpg", "crop"), boxes)
+        util.cropAndStoreImage(image_path, str(image_path).replace("jpg", "crop"))
 
     # Visualization of the results of a detection.
     # vis_util.visualize_boxes_and_labels_on_image_array(
