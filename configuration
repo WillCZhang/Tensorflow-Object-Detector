@@ -12,15 +12,15 @@ function setEnvVar() {
         export $1="$2"
     fi
     VAR=$(eval echo \$${1})
-    echo "$1=\"$VAR\"" >> $DOCKER_ENV
+    echo "$1=$VAR" >>$DOCKER_ENV
 }
 
 # Detector Configurations
-setEnvVar DATA_PATH "$PWD/data/"            # This path will hold both dataset and output results
-setEnvVar LABELED_IMAGE_PATH "$PWD/images"  # Path to labeled images
-setEnvVar CLASSES "classA, classB, classC"  # Classes for detection, split by comma
-setEnvVar MODEL_PATH "$PWD/model"           # This path must contain both "pipeline.config" & "model", see README
-setEnvVar NUM_TRAIN_STEPS 50000             # Max number of steps in training
-setEnvVar IS_GRAYSCALE "True"               # True/False whether the input image is in grayscale
-setEnvVar THRESHOLD "0.95"                  # Threshold for accepting a detection
-setEnvVar NEEDED_BOXES "classA:1, classC:3" # Format ClassName:NeededBoxNumber, only take NeededBoxNumber of detection result by confidence
+setEnvVar DATA_PATH "$PWD/data/"                # This path will hold both dataset and output results
+setEnvVar LABELED_IMAGE_PATH "$PWD/images"      # Path to labeled images
+setEnvVar CLASSES "\"classA, classB, classC\""  # Classes for detection, split by comma
+setEnvVar MODEL_PATH "$PWD/model"               # This path must contain both "pipeline.config" & "model", see README
+setEnvVar NUM_TRAIN_STEPS 50000                 # Max number of steps in training
+setEnvVar IS_GRAYSCALE "True"                   # True/False whether the input image is in grayscale
+setEnvVar THRESHOLD "0.95"                      # Threshold for accepting a detection
+setEnvVar NEEDED_BOXES "\"classA:1, classC:3\"" # Format ClassName:NeededBoxNumber, only take NeededBoxNumber of detection result by confidence

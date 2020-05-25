@@ -22,7 +22,7 @@ def loadEnvOrEmpty(var):
 def cropAndStoreImage(imagePath, cropFilePath):
     image = np.array(Image.open(imagePath))
     box = getBoxToCrop(cropFilePath, image.shape)
-    crop_image = image[box[0]:box[2], box[1]:box[3]]
+    crop_image = image[box[1]:box[3], box[0]:box[2]]
     coverted_image = Image.fromarray(crop_image, 'L')
     saved_path = str(imagePath).replace(".jpg", "-crop.jpg")
     coverted_image.save(saved_path)
@@ -31,6 +31,7 @@ def cropAndStoreImage(imagePath, cropFilePath):
 
 def getBoxToCrop(cropFilePath, shape):
     # This function assumes exactly one line of box info in the crop file
+    # shape should be [height, width] -- too lazy to fix naming
     with open(cropFilePath) as f:
         boxes_str = f.read()
     box = [float(i) for i in eval(boxes_str.split(" - ")[2])]
@@ -40,4 +41,4 @@ def getBoxToCrop(cropFilePath, shape):
     box_ymin = box[1] * height
     box_xmax = box[2] * width
     box_ymax = box[3] * height
-    return [int(i) for i in (box_xmin, box_ymin, box_xmax, box_ymax)]
+    return [int(i) for i in (box_ymin, box_xmin, box_ymax, box_xmax)]

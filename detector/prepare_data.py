@@ -86,6 +86,7 @@ class Image:
             if obj['name'] not in classes:
                 print('Unexpected Class: ' +
                       obj['name'] + ' in ' + data['path'])
+                continue
             classes_text.append(obj['name'].encode('utf8'))
             classes_id.append(getClassID(obj['name']))
 
@@ -106,18 +107,19 @@ class Image:
         return tf_example
 
     def __cropImage(self, data):
+        crop_image_path = util.cropAndStoreImage(self.jpg, self.crop)
         # Note: box format is (normalized) xmin, ymin, xmax, ymax
         box = util.getBoxToCrop(
-            self.crop, [int(data['size']['width']), int(data['size']['height'])])
+            self.crop, [int(data['size']['height']), int(data['size']['width'])])
         for obj in data['object']:
             # sadly there's no pointer in python... so can't abstract away
             obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[0]
             obj['bndbox']['ymin'] = float(obj['bndbox']['ymin']) - box[1]
-            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[2]
-            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[3]
-        data['size']['width'] = box[2] - box[0]
-        data['size']['height'] = box[3] - box[1]
-        return util.cropAndStoreImage(self.jpg, self.crop)
+            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[0]
+            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[1]
+        data['size']['width'] = box[3] - box[1]
+        data['size']['height'] = box[2] - box[0]
+        return crop_image_path
 
 
 def getClassID(className):
