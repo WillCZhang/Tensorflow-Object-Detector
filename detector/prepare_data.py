@@ -21,10 +21,103 @@ trainingPath = "/data/training"
 testingPath = "/data/testing"
 
 
-classes = [className.strip()
+classes = [className.replace("\"","").strip()
            for className in util.loadEnv("CLASSES").split(",")]
 if len(classes) == 0:
     raise ValueError("Please provide at least one class for training")
+
+
+class Image:
+    def __init__(self, imageName, srcPath=imagePath, dstPath=None):
+        def copyOrGetFilePath(filename):
+            src = os.path.join(srcPath, filename)
+            if dstPath is None:
+                return src
+            dst = os.path.join(dstPath, filename)
+            if os.path.exists(src):
+                shutil.copyfile(src, dst)
+                return dst
+            return ''
+        self.jpg = copyOrGetFilePath(imageName+".jpg")
+        self.xml = copyOrGetFilePath(imageName+".xml")
+        self.crop = copyOrGetFilePath(imageName+".crop")
+
+    def createTFExample(self):
+        """Convert XML derived dict to tf.Example proto.
+        Notice that this function normalizes the bounding box coordinates provided
+        by the raw data.
+        Args: None
+        Returns:
+            example: The converted tf.Example.
+        """
+        with tf.io.gfile.GFile(self.xml, 'r') as fid:
+            xml_str = fid.read()
+        xml = etree.fromstring(xml_str)
+        data = dataset_util.recursive_parse_xml_to_dict(xml)[
+            'annotation']
+        # the image might be processed in a different location
+        # so overwrite the path to the input image path for consistency
+        data['path'] = self.jpg if self.crop == '' else self.__cropImage(data)
+
+        width = int(data['size']['width'])
+        height = int(data['size']['height'])
+        filename = data['filename'].encode('utf8')
+        with tf.io.gfile.GFile(data['path'], 'rb') as fid:
+            encoded_image_data = fid.read()
+        image_format = 'jpeg'.encode('utf8')
+
+        # List of normalized left x coordinates in bounding box (1 per box)
+        xmins = []
+        # List of normalized right x coordinates in bounding box (1 per box)
+        xmaxs = []
+        # List of normalized top y coordinates in bounding box (1 per box)
+        ymins = []
+        # List of normalized bottom y coordinates in bounding box (1 per box)
+        ymaxs = []
+        # List of string class name of bounding box (1 per box)
+        classes_text = []
+        classes_id = []  # List of integer class id of bounding box (1 per box)
+
+        for obj in data['object']:
+            xmins.append(float(obj['bndbox']['xmin']) / width)
+            ymins.append(float(obj['bndbox']['ymin']) / height)
+            xmaxs.append(float(obj['bndbox']['xmax']) / width)
+            ymaxs.append(float(obj['bndbox']['ymax']) / height)
+            if obj['name'] not in classes:
+                print('Unexpected Class: ' +
+                      obj['name'] + ' in ' + data['path'])
+            classes_text.append(obj['name'].encode('utf8'))
+            classes_id.append(getClassID(obj['name']))
+
+        tf_example = tf.train.Example(features=tf.train.Features(feature={
+            'image/height': dataset_util.int64_feature(height),
+            'image/width': dataset_util.int64_feature(width),
+            'image/filename': dataset_util.bytes_feature(filename),
+            'image/source_id': dataset_util.bytes_feature(filename),
+            'image/encoded': dataset_util.bytes_feature(encoded_image_data),
+            'image/format': dataset_util.bytes_feature(image_format),
+            'image/object/bbox/xmin': dataset_util.float_list_feature(xmins),
+            'image/object/bbox/ymin': dataset_util.float_list_feature(ymins),
+            'image/object/bbox/xmax': dataset_util.float_list_feature(xmaxs),
+            'image/object/bbox/ymax': dataset_util.float_list_feature(ymaxs),
+            'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
+            'image/object/class/label': dataset_util.int64_list_feature(classes_id),
+        }))
+        return tf_example
+
+    def __cropImage(self, data):
+        # Note: box format is (normalized) xmin, ymin, xmax, ymax
+        box = util.getBoxToCrop(
+            self.crop, [int(data['size']['width']), int(data['size']['height'])])
+        for obj in data['object']:
+            # sadly there's no pointer in python... so can't abstract away
+            obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[0]
+            obj['bndbox']['ymin'] = float(obj['bndbox']['ymin']) - box[1]
+            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[2]
+            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[3]
+        data['size']['width'] = box[2] - box[0]
+        data['size']['height'] = box[3] - box[1]
+        return util.cropAndStoreImage(self.jpg, self.crop)
 
 
 def getClassID(className):
@@ -32,85 +125,15 @@ def getClassID(className):
     return classes.index(className) + 1
 
 
-def createTFExample(data):
-    """Convert XML derived dict to tf.Example proto.
-    Notice that this function normalizes the bounding box coordinates provided
-    by the raw data.
-    Args:
-        data: dict holding XML fields for a single image (obtained by
-            running dataset_util.recursive_parse_xml_to_dict)
-    Returns:
-        example: The converted tf.Example.
-    """
-    width = int(data['size']['width'])
-    height = int(data['size']['height'])
-    filename = data['filename'].encode('utf8')
-    with tf.io.gfile.GFile(data['path'], 'rb') as fid:
-        encoded_image_data = fid.read()
-    image_format = 'jpeg'.encode('utf8')
+def generateDataset(labeledImageNames, labelMap, dst):
+    with open(os.path.join(dst, labelMapFilename), 'w') as f:
+        f.write(labelMap)
 
-    # List of normalized left x coordinates in bounding box (1 per box)
-    xmins = []
-    # List of normalized right x coordinates in bounding box (1 per box)
-    xmaxs = []
-    # List of normalized top y coordinates in bounding box (1 per box)
-    ymins = []
-    # List of normalized bottom y coordinates in bounding box (1 per box)
-    ymaxs = []
-    classes_text = []  # List of string class name of bounding box (1 per box)
-    classes_id = []  # List of integer class id of bounding box (1 per box)
-
-    for obj in data['object']:
-        xmins.append(float(obj['bndbox']['xmin']) / width)
-        ymins.append(float(obj['bndbox']['ymin']) / height)
-        xmaxs.append(float(obj['bndbox']['xmax']) / width)
-        ymaxs.append(float(obj['bndbox']['ymax']) / height)
-        if obj['name'] not in classes:
-            raise ValueError('Unexpected Class: ' +
-                             obj['name'] + ' in ' + data['path'])
-        classes_text.append(obj['name'].encode('utf8'))
-        classes_id.append(getClassID(obj['name']))
-
-    tf_example = tf.train.Example(features=tf.train.Features(feature={
-        'image/height': dataset_util.int64_feature(height),
-        'image/width': dataset_util.int64_feature(width),
-        'image/filename': dataset_util.bytes_feature(filename),
-        'image/source_id': dataset_util.bytes_feature(filename),
-        'image/encoded': dataset_util.bytes_feature(encoded_image_data),
-        'image/format': dataset_util.bytes_feature(image_format),
-        'image/object/bbox/xmin': dataset_util.float_list_feature(xmins),
-        'image/object/bbox/xmax': dataset_util.float_list_feature(xmaxs),
-        'image/object/bbox/ymin': dataset_util.float_list_feature(ymins),
-        'image/object/bbox/ymax': dataset_util.float_list_feature(ymaxs),
-        'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
-        'image/object/class/label': dataset_util.int64_list_feature(classes_id),
-    }))
-    return tf_example
-
-
-def prepareFile(filename, src, dst):
-    if not os.path.exists(os.path.join(dst, filename)):
-        shutil.copyfile(os.path.join(src, filename),
-                        os.path.join(dst, filename))
-    return os.path.join(dst, filename)
-
-
-def generateDataset(labeledImageNames, dst):
     writer = tf.io.TFRecordWriter(os.path.join(dst, recordFilename))
 
     for imageName in labeledImageNames:
-        xml = prepareFile(imageName + '.xml', imagePath, dst)
-        jpg = prepareFile(imageName + '.jpg', imagePath, dst)
-
-        with tf.io.gfile.GFile(xml, 'r') as fid:
-            xml_str = fid.read()
-        xml = etree.fromstring(xml_str)
-        parsedData = dataset_util.recursive_parse_xml_to_dict(xml)[
-            'annotation']
-        # the image might be processed in a different location
-        # so overwrite the path to the input image path for consistency
-        parsedData['path'] = jpg
-        tf_example = createTFExample(parsedData)
+        image = Image(imageName, dstPath=dst)
+        tf_example = image.createTFExample()
         writer.write(tf_example.SerializeToString())
 
     writer.close()
@@ -136,14 +159,6 @@ def run():
             else:
                 temp.add(filename)
 
-    # Generate Label Map
-    labelMap = "\n".join([generateLabelMapItem(className)
-                          for className in classes])
-    with open(os.path.join(trainingPath, labelMapFilename), 'w') as f:
-        f.write(labelMap)
-    with open(os.path.join(testingPath, labelMapFilename), 'w') as f:
-        f.write(labelMap)
-
     # Spliting Testing & Training Datasets
     testImageNames = []
     for i in range(math.ceil(ratio * len(labeledImageNames))):
@@ -152,5 +167,12 @@ def run():
         testImageNames.append(imageName)
         labeledImageNames.remove(imageName)
 
-    generateDataset(labeledImageNames, trainingPath)
-    generateDataset(testImageNames, testingPath)
+    # Generate Label Map
+    labelMap = "\n".join([generateLabelMapItem(className)
+                          for className in classes])
+
+    generateDataset(labeledImageNames, labelMap, trainingPath)
+    generateDataset(testImageNames, labelMap, testingPath)
+
+
+run()

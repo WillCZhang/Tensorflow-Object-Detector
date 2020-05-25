@@ -1,0 +1,7 @@
+FROM object-detector
+RUN pip install --upgrade tensorflow
+RUN pip install jupyter
+RUN pip install notebook
+RUN echo "export PATH=$PATH:~/.local/bin" >> ~/.bashrc
+COPY . /app
+COPY detect /usr/bin/

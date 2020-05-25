@@ -1,0 +1,20 @@
+#!/bin/bash
+
+EXPORT_DIR="/model/saved_model"
+echo "Please remove saved_model folder if you want to retrain your model"
+if [ ! -d "$EXPORT_DIR" ]; then
+    INPUT_TYPE=image_tensor
+    PIPELINE_CONFIG_PATH="/model/pipeline.config"
+    TRAINED_CKPT_PREFIX=$(basename $(ls -t /model/model | grep "model.ckpt.*meta" | head -1) .meta)
+    echo "Using Trained model $TRAINED_CKPT_PREFIX"
+    mkdir $EXPORT_DIR
+    python object_detection/export_inference_graph.py \
+        --input_type=${INPUT_TYPE} \
+        --pipeline_config_path=${PIPELINE_CONFIG_PATH} \
+        --trained_checkpoint_prefix="/model/model/${TRAINED_CKPT_PREFIX}" \
+        --output_directory=${EXPORT_DIR}
+fi
+
+# jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --NotebookApp.token='' --NotebookApp.password='' &
+
+python /app/detect.py

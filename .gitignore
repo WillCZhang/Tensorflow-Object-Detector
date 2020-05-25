@@ -152,3 +152,7 @@ data
 model
 
 detector/env
+
+my_config*
+
+.DS_Store
