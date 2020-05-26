@@ -21,7 +21,7 @@ trainingPath = "/data/training"
 testingPath = "/data/testing"
 
 
-classes = [className.replace("\"","").strip()
+classes = [className.replace("\"", "").strip()
            for className in util.loadEnv("CLASSES").split(",")]
 if len(classes) == 0:
     raise ValueError("Please provide at least one class for training")
@@ -79,14 +79,13 @@ class Image:
         classes_id = []  # List of integer class id of bounding box (1 per box)
 
         for obj in data['object']:
+            if obj['name'] not in classes or not self.__isValidBox(obj, width, height):
+                print('Unexpected object: ' + str(obj) + ' in ' + data['path'])
+                continue
             xmins.append(float(obj['bndbox']['xmin']) / width)
             ymins.append(float(obj['bndbox']['ymin']) / height)
             xmaxs.append(float(obj['bndbox']['xmax']) / width)
             ymaxs.append(float(obj['bndbox']['ymax']) / height)
-            if obj['name'] not in classes:
-                print('Unexpected Class: ' +
-                      obj['name'] + ' in ' + data['path'])
-                continue
             classes_text.append(obj['name'].encode('utf8'))
             classes_id.append(getClassID(obj['name']))
 
@@ -107,19 +106,24 @@ class Image:
         return tf_example
 
     def __cropImage(self, data):
-        crop_image_path = util.cropAndStoreImage(self.jpg, self.crop)
-        # Note: box format is (normalized) xmin, ymin, xmax, ymax
+        # Note: box format is (normalized) ymin, xmin, ymax, xmax
         box = util.getBoxToCrop(
             self.crop, [int(data['size']['height']), int(data['size']['width'])])
-        for obj in data['object']:
-            # sadly there's no pointer in python... so can't abstract away
-            obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[0]
-            obj['bndbox']['ymin'] = float(obj['bndbox']['ymin']) - box[1]
-            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[0]
-            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[1]
         data['size']['width'] = box[3] - box[1]
         data['size']['height'] = box[2] - box[0]
-        return crop_image_path
+        for obj in data['object']:
+            # sadly there's no pointer in python... so can't abstract away
+            obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[1]
+            obj['bndbox']['ymin'] = float(obj['bndbox']['ymin']) - box[0]
+            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[1]
+            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[0]
+        return util.cropAndStoreImage(self.jpg, self.crop)
+
+    def __isValidBox(self, obj, width, height):
+        return (0 < obj['bndbox']['xmin'] < width and
+                0 < obj['bndbox']['xmax'] < width and
+                0 < obj['bndbox']['ymin'] < height and
+                0 < obj['bndbox']['ymax'] < height)
 
 
 def getClassID(className):
