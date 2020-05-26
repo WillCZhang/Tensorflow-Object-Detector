@@ -113,10 +113,10 @@ class Image:
         data['size']['height'] = box[2] - box[0]
         for obj in data['object']:
             # sadly there's no pointer in python... so can't abstract away
-            obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[1]
-            obj['bndbox']['ymin'] = float(obj['bndbox']['ymin']) - box[0]
-            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[1]
-            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[0]
+            obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[0]
+            obj['bndbox']['ymin'] = float(obj['bndbox']['ymin']) - box[1]
+            obj['bndbox']['xmax'] = float(obj['bndbox']['xmax']) - box[0]
+            obj['bndbox']['ymax'] = float(obj['bndbox']['ymax']) - box[1]
         return util.cropAndStoreImage(self.jpg, self.crop)
 
     def __isValidBox(self, obj, width, height):
