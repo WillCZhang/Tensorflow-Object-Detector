@@ -59,6 +59,8 @@ class Image:
         # so overwrite the path to the input image path for consistency
         data['path'] = self.jpg if self.crop == '' else self.__cropImage(data)
 
+        print(f"Processing image {data['path']}")
+
         width = int(data['size']['width'])
         height = int(data['size']['height'])
         filename = data['filename'].encode('utf8')
@@ -78,6 +80,8 @@ class Image:
         classes_text = []
         classes_id = []  # List of integer class id of bounding box (1 per box)
 
+        image = util.loadImage(data['path'])
+
         for obj in data['object']:
             if obj['name'] not in classes or not self.__isValidBox(obj, width, height):
                 print('Unexpected object: ' + str(obj) + ' in ' + data['path'])
@@ -88,6 +92,9 @@ class Image:
             ymaxs.append(float(obj['bndbox']['ymax']) / height)
             classes_text.append(obj['name'].encode('utf8'))
             classes_id.append(getClassID(obj['name']))
+            util.drawBox(image, self.__encodeBox(obj['bndbox']))
+
+        util.saveImage(image, str(data['path']).replace(".jpg", "-with-boxes.jpg"))
 
         tf_example = tf.train.Example(features=tf.train.Features(feature={
             'image/height': dataset_util.int64_feature(height),
@@ -105,12 +112,15 @@ class Image:
         }))
         return tf_example
 
+    def __encodeBox(self, obj_box):
+        return [obj_box[i] for i in ['xmin', 'ymin', 'xmax', 'ymax']]
+
     def __cropImage(self, data):
         # Note: box format is (normalized) ymin, xmin, ymax, xmax
         box = util.getBoxToCrop(
             self.crop, [int(data['size']['height']), int(data['size']['width'])])
-        data['size']['width'] = box[3] - box[1]
-        data['size']['height'] = box[2] - box[0]
+        data['size']['width'] = box[2] - box[0]
+        data['size']['height'] = box[3] - box[1]
         for obj in data['object']:
             # sadly there's no pointer in python... so can't abstract away
             obj['bndbox']['xmin'] = float(obj['bndbox']['xmin']) - box[0]

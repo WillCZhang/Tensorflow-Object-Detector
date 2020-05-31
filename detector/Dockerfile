@@ -12,11 +12,12 @@ RUN pip install --upgrade numpy==1.17.2
 RUN wget -O protobuf.zip https://github.com/google/protobuf/releases/download/v3.0.0/protoc-3.0.0-linux-x86_64.zip
 RUN unzip protobuf.zip
 RUN git clone https://github.com/tensorflow/models.git /models
-COPY . /app
 COPY train /usr/bin/
 COPY detect /usr/bin/
 COPY save /usr/bin/
+COPY recover /usr/bin/
 WORKDIR /models/research
 RUN /bin/protoc object_detection/protos/*.proto --python_out=.
 RUN echo "export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim" >> ~/.bashrc
+COPY . /app
 ENTRYPOINT [ "bash" ]

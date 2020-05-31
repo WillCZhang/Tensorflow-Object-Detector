@@ -24,3 +24,6 @@ setEnvVar NUM_TRAIN_STEPS 50000                 # Max number of steps in trainin
 setEnvVar IS_GRAYSCALE "True"                   # True/False whether the input image is in grayscale
 setEnvVar THRESHOLD "0.95"                      # Threshold for accepting a detection
 setEnvVar NEEDED_BOXES "\"classA:1, classC:3\"" # Format ClassName:NeededBoxNumber, only take NeededBoxNumber of detection result by confidence
+setEnvVar MODEL_TO_DETECT ""
+setEnvVar TO_DETECT_PATH_SUFFIX ""
+setEnvVar TO_RECOVER ""

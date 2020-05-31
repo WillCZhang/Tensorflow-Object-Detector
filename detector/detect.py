@@ -25,10 +25,16 @@ utils_ops.tf = tf.compat.v1
 tf.gfile = tf.io.gfile
 
 # Assume this script will be executed inside docker
-model_path = "/model/saved_model/saved_model"
 to_detect_path = "/data/to_detect"
 label_map_path = '/data/training/label_map.pbtxt'
+
 isGrayscale = bool(util.loadEnv("IS_GRAYSCALE"))
+model_path = util.loadEnvOrEmpty('MODEL_TO_DETECT')
+if model_path == '':
+    model_path = "/model/saved_model/saved_model"
+pathSuffix = util.loadEnvOrEmpty('TO_DETECT_PATH_SUFFIX')
+if pathSuffix == '':
+    pathSuffix = '.jpg'
 
 if not os.path.exists(model_path):
     raise IOError(
@@ -43,7 +49,7 @@ if not os.path.exists(label_map_path):
         'Please make sure you have label_map.pbtxt under <DATA_PATH>/training')
 
 PATH_TO_TEST_IMAGES_DIR = pathlib.Path(to_detect_path)
-TEST_IMAGE_PATHS = sorted(list(PATH_TO_TEST_IMAGES_DIR.glob("*.jpg")))
+TEST_IMAGE_PATHS = sorted(list(PATH_TO_TEST_IMAGES_DIR.glob(f"*{pathSuffix}")))
 
 
 category_ids = label_map_util.get_label_map_dict(label_map_path)
@@ -108,7 +114,6 @@ def run_inference_for_single_image(model, image, isGrayscale=False):
 
 
 def show_inference(model, image_path, isGrayscale=False):
-    print("Processing image " + str(image_path))
     reloadRequiredBoxes()
     # the array based representation of the image will be used later in order to prepare the
     # result image with boxes and labels on it.
@@ -150,5 +155,8 @@ def show_inference(model, image_path, isGrayscale=False):
     #     line_thickness=8)
 
 
+count = 1
 for image_path in TEST_IMAGE_PATHS:
     show_inference(load_model(), image_path, isGrayscale)
+    print(f"Processing image {str(image_path)} -- {count} of {len(TEST_IMAGE_PATHS)}")
+    count += 1
