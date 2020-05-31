@@ -2,8 +2,8 @@
 
 tensorboard --logdir=/model/model & 
 
-# python object_detection/model_main.py \
-#     --pipeline_config_path=/model/pipeline.config \
-#     --model_dir=/model/model \
-#     --num_train_steps=${NUM_TRAIN_STEPS} \
-#     --alsologtostderr
+python object_detection/model_main.py \
+    --pipeline_config_path=/model/pipeline.config \
+    --model_dir=/model/model \
+    --num_train_steps=${NUM_TRAIN_STEPS} \
+    --alsologtostderr
